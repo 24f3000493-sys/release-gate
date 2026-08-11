@@ -1,0 +1,39 @@
+name: TDS GA7 Release Gate
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-endpoint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: TDS identity: 24f3000493@ds.study.iitm.ac.in
+        run: echo "Identity verified for the auto-grader."
+
+      - name: Test Release Gate Implementation
+        run: |
+          API_URL="https://release-gate-u8a5.onrender.com/release-gate"
+          
+          echo "Sending a safe payload to test the endpoint..."
+          curl -X POST $API_URL \
+          -H "Content-Type: application/json" \
+          -d '{
+            "target": "preview",
+            "event": "pull_request",
+            "ref": "refs/heads/feature",
+            "workflow": {
+              "trigger": "pull_request",
+              "permissions": {"contents":"read", "packages":"write", "id-token":"none"},
+              "testsPassed": true, "matrixComplete": true, "failFast": false,
+              "actions": [{"owner":"actions", "name":"checkout", "ref":"v4"}]
+            },
+            "image": {
+              "multiStage": true, "runsAsRoot": false, "secretMode": "none",
+              "criticalVulnerabilities": 0, "digestPinned": true
+            }
+          }'
