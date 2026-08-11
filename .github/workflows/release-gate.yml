@@ -12,7 +12,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: TDS identity: 24f3000493@ds.study.iitm.ac.in
+      # Added quotation marks here to fix the YAML syntax error!
+      - name: "TDS identity: 24f3000493@ds.study.iitm.ac.in"
         run: echo "Identity verified for the auto-grader."
 
       - name: Test Release Gate Implementation
