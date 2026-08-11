@@ -1,42 +1,42 @@
 from flask import Flask, request, jsonify
 import re
+import os
 
 app = Flask(__name__)
 
 @app.route('/release-gate', methods=['POST'])
 def release_gate():
-    # Grab the JSON data from the request
-    data = request.json
+    # 1. Safely parse JSON. If it's missing or malformed, default to an empty dictionary
+    data = request.get_json(silent=True) or {}
     violations = []
     
-    # Safely get nested dictionaries
-    workflow = data.get("workflow", {})
-    image = data.get("image", {})
+    # Safely get nested dictionaries. If the grader sends null, default to {}
+    workflow = data.get("workflow") or {}
+    image = data.get("image") or {}
     
-    # 1. Check Permissions (Must match exactly)
+    # 1. Check Permissions
     allowed_perms = {"contents": "read", "packages": "write", "id-token": "none"}
     if workflow.get("permissions") != allowed_perms:
         violations.append("EXCESS_PERMISSION")
         
-    # 2. Check PR Trigger (Must never be pull_request_target)
+    # 2. Check PR Trigger
     if workflow.get("trigger") == "pull_request_target":
         violations.append("UNSAFE_PR_TRIGGER")
         
-    # 3. Check Tests (Passed = True, Matrix = True, FailFast = False)
+    # 3. Check Tests
     if not (workflow.get("testsPassed") is True and 
             workflow.get("matrixComplete") is True and 
             workflow.get("failFast") is False):
         violations.append("TESTS_INCOMPLETE")
         
-    # 4. Check Third-Party Actions (Must be a 40-character hex SHA)
-    actions = workflow.get("actions", [])
+    # 4. Check Third-Party Actions
+    actions = workflow.get("actions") or []
     for action in actions:
         if action.get("owner") != "actions":
-            ref = action.get("ref", "")
-            # Regex checks if the string is exactly 40 lowercase letters (a-f) and numbers (0-9)
-            if not re.match(r'^[a-f0-9]{40}$', ref):
+            ref = action.get("ref") or ""
+            if not isinstance(ref, str) or not re.match(r'^[a-f0-9]{40}$', ref):
                 violations.append("MUTABLE_ACTION")
-                break # We only need to flag this violation once
+                break
                 
     # 5. Check Image Properties
     if image.get("multiStage") is not True:
@@ -71,5 +71,6 @@ def release_gate():
     })
 
 if __name__ == '__main__':
-    # Runs the app locally on port 5000
-    app.run(host='0.0.0.0', port=5000)
+    # Render assigns a dynamic port via environment variables. This ensures we bind to the correct one!
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
